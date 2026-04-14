@@ -1,0 +1,9 @@
+Use Case 1 = Error Detection Agent
+UPG would like to leverage an AI Agent to:
+View the Azure SQL DB log database for Exceptions and Errors
+Create a ticket in Azure DevOps corresponding to these Exceptions and Errors.
+Highlight which errors are occurring more than once.
+Fork a repo from the current main branch
+Propose a fix for this exception/error using an LLM
+Alert a human to view the changes/updates proposed.
+Assist the human-in-loop to merge the branch back to main once the human-in-the-loop approves i
