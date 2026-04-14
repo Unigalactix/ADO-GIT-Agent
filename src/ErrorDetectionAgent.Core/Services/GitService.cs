@@ -73,9 +73,19 @@ public sealed class GitService : IGitService
         Commands.Checkout(repo, branch);
 
         // Write proposed changes to the affected files
+        var repoRoot = Path.GetFullPath(_settings.RepoLocalPath);
         foreach (var file in fix.AffectedFiles)
         {
-            var fullPath = Path.Combine(_settings.RepoLocalPath, file);
+            var fullPath = Path.GetFullPath(Path.Combine(repoRoot, file));
+
+            // Guard against path traversal — ensure the resolved path stays inside the repo
+            if (!fullPath.StartsWith(repoRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                && fullPath != repoRoot)
+            {
+                throw new InvalidOperationException(
+                    $"Affected file path '{file}' resolves outside the repository root.");
+            }
+
             var directory = Path.GetDirectoryName(fullPath);
             if (directory != null)
             {
@@ -133,13 +143,14 @@ public sealed class GitService : IGitService
         var json = System.Text.Json.JsonSerializer.Serialize(payload);
         var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
-        // Add Basic auth header
+        // Use per-request auth header to avoid thread-safety issues on shared HttpClient
         var token = Convert.ToBase64String(
             System.Text.Encoding.ASCII.GetBytes($":{_settings.DevOpsPat}"));
-        _httpClient.DefaultRequestHeaders.Authorization =
+        var request = new HttpRequestMessage(HttpMethod.Post, apiUrl) { Content = content };
+        request.Headers.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", token);
 
-        var response = await _httpClient.PostAsync(apiUrl, content, cancellationToken);
+        var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);

@@ -40,11 +40,9 @@ public sealed class MergeAssistant : IMergeAssistant
         var pollInterval = TimeSpan.FromSeconds(_settings.MergePollIntervalSeconds);
         var deadline = DateTime.UtcNow + timeout;
 
-        // Set up auth
+        // Auth token for per-request headers (avoids thread-safety issues on shared HttpClient)
         var token = Convert.ToBase64String(
             System.Text.Encoding.ASCII.GetBytes($":{_settings.DevOpsPat}"));
-        _httpClient.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", token);
 
         _logger.LogInformation(
             "Monitoring PR for approval (timeout: {Timeout} min, poll: {Poll} sec)",
@@ -57,12 +55,12 @@ public sealed class MergeAssistant : IMergeAssistant
             try
             {
                 var (isApproved, prId) = await CheckApprovalStatusAsync(
-                    pullRequestUrl, cancellationToken);
+                    pullRequestUrl, token, cancellationToken);
 
                 if (isApproved && prId.HasValue)
                 {
                     _logger.LogInformation("PR #{PrId} is approved — completing merge", prId);
-                    return await CompleteMergeAsync(pullRequestUrl, prId.Value, cancellationToken);
+                    return await CompleteMergeAsync(pullRequestUrl, prId.Value, token, cancellationToken);
                 }
 
                 _logger.LogDebug("PR not yet approved — next check in {Seconds}s",
@@ -85,6 +83,7 @@ public sealed class MergeAssistant : IMergeAssistant
 
     private async Task<(bool IsApproved, int? PrId)> CheckApprovalStatusAsync(
         string pullRequestUrl,
+        string authToken,
         CancellationToken cancellationToken)
     {
         // Append API version if not present
@@ -92,7 +91,11 @@ public sealed class MergeAssistant : IMergeAssistant
             ? pullRequestUrl
             : pullRequestUrl + (pullRequestUrl.Contains('?') ? "&" : "?") + "api-version=7.0";
 
-        var response = await _httpClient.GetAsync(apiUrl, cancellationToken);
+        var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authToken);
+
+        var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -120,6 +123,7 @@ public sealed class MergeAssistant : IMergeAssistant
     private async Task<bool> CompleteMergeAsync(
         string pullRequestUrl,
         int prId,
+        string authToken,
         CancellationToken cancellationToken)
     {
         var apiUrl = pullRequestUrl.Contains("api-version")
@@ -144,6 +148,8 @@ public sealed class MergeAssistant : IMergeAssistant
         {
             Content = content
         };
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authToken);
 
         var response = await _httpClient.SendAsync(request, cancellationToken);
 
