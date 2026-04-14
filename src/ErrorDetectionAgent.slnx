@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ErrorDetectionAgent.App/ErrorDetectionAgent.App.csproj" />
+  <Project Path="ErrorDetectionAgent.Core/ErrorDetectionAgent.Core.csproj" />
+</Solution>
