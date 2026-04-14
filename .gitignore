@@ -1,0 +1,32 @@
+## .NET / C#
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+.vs/
+
+## NuGet
+*.nupkg
+**/packages/*
+*.nuget.props
+*.nuget.targets
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+## OS generated files
+.DS_Store
+Thumbs.db
+
+## IDE
+.idea/
+*.swp
+*~
+
+## User-specific appsettings (may contain secrets)
+appsettings.Development.json
+appsettings.Production.json
